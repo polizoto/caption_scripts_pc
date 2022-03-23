@@ -2,6 +2,7 @@
 # Joseph Polizzotto
 # Wake Technical Community College
 # 919-866-7977
+$ version 0.0.2
 
 find . -type f -name "~*.txt" -exec rm -f {} \;
 
@@ -36,6 +37,8 @@ cp "$x" "$new".md
 sed -i '1 s/^/# /' "$new".md
 
 pandoc -M document-css=false -H /c/stylesheets/standard.css -i "$new".md -f markdown -s -t html5 --metadata pagetitle="$baseName"\ -\ Transcript -o "$new".html
+
+sed -i 's/lang=""/lang="en"/g' "$new".html
 
 # Remove files
 

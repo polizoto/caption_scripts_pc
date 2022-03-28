@@ -36,7 +36,7 @@ exit 1
 
 fi
 
-echo -ne "\nConverting YouTube Captions to transcripts...\r"
+echo -ne "\nConverting YouTube Captions to description...\r"
 
 youtube-dl --skip-download --write-sub $1 >/dev/null 2>&1
 
@@ -241,24 +241,15 @@ cp "$x" "$new".md
 
 sed -i '1 s/^/# /' "$new".md
 
-pandoc -M document-css=false -H /c/stylesheets/standard.css -i "$new".md -f markdown -s -t html5 --metadata pagetitle="$baseName"\ -\ Transcript -o "$new".html
 
-# Edit HTML
-# Add missing value for lang attribute
 
-sed -i 's/lang=""/lang="en"/g' "$new".html
-
-sed -i 's/”/"/g' "$new".html
-
-sed -i 's/“/"/g' "$new".html
-
-sed -i "s/’/'/g" "$new".html
+pandoc "$new".md -f markdown -t docx -o "$new".docx
 
 # Remove files
 
-rm "$new".md
+# rm "$new".md
 
 done
 
-echo -e "Converting YouTube Captions to transcripts... \033[1;32mDone\033[0m.\r"
+echo -e "Converting YouTube Captions to description... \033[1;32mDone\033[0m.\r"
 

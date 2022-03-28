@@ -36,7 +36,7 @@ exit 1
 
 fi
 
-echo -ne "\nConverting YouTube Captions to transcripts...\r"
+echo -ne "\nConverting YouTube Captions to descriptive transcripts...\r"
 
 youtube-dl --skip-download --write-sub $1 >/dev/null 2>&1
 
@@ -176,7 +176,7 @@ sed -zi 's/\.”\s/.”\n\n/g' "$new".txt
 
 # Add Transcript text to the top of the TXT file, with a blank line before transcript
 
-awk -i inplace -v ORS='\r\n' 'FNR==1{print FILENAME " Transcript:"}1' "$new".txt 
+awk -i inplace -v ORS='\r\n' 'FNR==1{print FILENAME " Descriptive Transcript:"}1' "$new".txt 
 
 sed -i '1 s/^.*\///' "$new".txt
 
@@ -227,7 +227,7 @@ done
 
 fi
 
-# Create HTML files
+# Create DOCX files
 
 for x in ./*.txt; do
 
@@ -241,24 +241,38 @@ cp "$x" "$new".md
 
 sed -i '1 s/^/# /' "$new".md
 
-pandoc -M document-css=false -H /c/stylesheets/standard.css -i "$new".md -f markdown -s -t html5 --metadata pagetitle="$baseName"\ -\ Transcript -o "$new".html
+sed -i 's/”/"/g' "$new".md
 
-# Edit HTML
-# Add missing value for lang attribute
+sed -i 's/“/"/g' "$new".md
 
-sed -i 's/lang=""/lang="en"/g' "$new".html
+sed -i "s/’/'/g" "$new".md
 
-sed -i 's/”/"/g' "$new".html
+# remove blank lines and 
+sed -i -z 's/\n\n/\n/g' "$new".md
 
-sed -i 's/“/"/g' "$new".html
+# add Pipe to beginning of lines
 
-sed -i "s/’/'/g" "$new".html
+sed -i 's/^/| /g' "$new".md
+
+sed -i 's/$/ | blank | /g' "$new".md
+
+# remove pipes from first line
+
+sed -i '1 s/^| //g' "$new".md
+
+sed -i '1 s/ | blank | $//g' "$new".md
+
+# Add markdown table header markup
+sed -i '2 s/^\(.*\)$/\n| Audio | Visual |\n| :------ | :------ |\n\1/g' "$new".md
+
+pandoc  "$new".md -f markdown -t docx -o "$new".docx
 
 # Remove files
 
 rm "$new".md
 
+rm "$x"
+
 done
 
-echo -e "Converting YouTube Captions to transcripts... \033[1;32mDone\033[0m.\r"
-
+echo -e "Converting YouTube Captions to descriptive transcripts... \033[1;32mDone\033[0m.\r"

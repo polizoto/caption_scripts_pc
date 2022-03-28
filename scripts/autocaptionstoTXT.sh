@@ -2,7 +2,7 @@
 # Joseph Polizzotto
 # Wake Technical Community College
 # 919-866-7977
-# version 0.0.3
+# version 0.0.2
 
 if ! [ -x "$(command -v youtube-dl)" ]; then
 
@@ -28,17 +28,9 @@ exit
 
 fi
 
-if ! [ -x "$(command -v pandoc)" ]; then
+echo -ne "\nConverting YouTube auto-captions to TXT...\r"
 
-echo -e "\n\033[1;31mError: Pandoc (https://pandoc.org/installing.html)is not installed. Exiting...\033[0m" >&2
-
-exit 1
-
-fi
-
-echo -ne "\nConverting YouTube Captions to transcripts...\r"
-
-youtube-dl --skip-download --write-sub $1 >/dev/null 2>&1
+youtube-dl --skip-download --write-sub --write-auto-sub $1 >/dev/null 2>&1
 
 if [ -n "$(find . -maxdepth 1 -name '*.en-*.vtt' -type f -print -quit)" ]; then
 
@@ -64,8 +56,6 @@ done
 
 fi
 
-# Find and delete random YT filename strings
-
 for f in ./*.vtt; do
 
     new=$(printf "%s\n" "$f" | sed 's/\(.*\)-[^-]*.\en\(\.[^-]*\)/\1\2/')
@@ -74,16 +64,6 @@ for f in ./*.vtt; do
 
 done
 
-if [ -n "$(find . -maxdepth 1 -name '*-.vtt' -type f -print -quit)" ]; then
-
-for f in *-.vtt; do 
-
-mv -- "$f" "${f//-.vtt/.vtt}"; 
-
-done
-
-fi
-
 for x in ./*.vtt; do
 
 new="${x%.*}"
@@ -91,6 +71,12 @@ new="${x%.*}"
 cp "$x" "$new".txt
 
 # remove WEBVTT markup
+
+# Remove <c> tags that may appear in some webVTT files
+
+if grep -qi "<c>" "$new".txt > /dev/null ; then perl -0777 -i -pe 's/<.*?>//gs' "$new".txt ;  fi
+
+#
 
 sed -i 's/^WEBVTT$//g' "$new".txt
 
@@ -113,6 +99,14 @@ sed -i ':a;N;$!ba;s/\n/ /g' "$new".txt
 # Remove double words
 
 sed -i -e 's/\b\([a-z]\+\)[ ,\n]\1/\1/g' "$new".txt
+
+# Punctuate text
+
+read -r CONTENTS < "$new".txt
+
+# feed text into punctuator
+
+curl -sS -d "text=$CONTENTS" http://bark.phon.ioc.ee/punctuator > "$new".txt
 
 # Place sentences on their own lines
 
@@ -156,36 +150,53 @@ sed -i -e 's/\([Tt]he \)\(\w*\)\( window\)\b/\1\u\2 window/g' "$new".txt
 
 sed -i -e 's/\([Tt]he \)\(\w*\)\( pane\)\b/\1\u\2 pane/g' "$new".txt
 
+# capitalize chapter and word that comes after
+
+sed -i -e 's/\( chapter \)\(\w*\)/ Chapter \u\2/g' "$new".txt
+
+# capitalize week
+
+sed -i -e 's/\( week \)\([[:digit:]]\)/ Week \2/g' "$new".txt
+
+# capitalize section
+
+sed -i -e 's/\( section \)\([[:digit:]]\)/ Section \2/g' "$new".txt
+
+# capitalize module
+
+sed -i -e 's/\( module \)\([[:digit:]]\)/ Module \2/g' "$new".txt
+
 # Clean up punctuation errors
+
+sed -i -e "s/'Ve/'ve/g" "$new".txt
+
+sed -i -e "s/'Re/'re/g" "$new".txt
+
+sed -i -e "s/'S/'s/g" "$new".txt
+
+sed -i -e "s/'T/'t/g" "$new".txt
+
+sed -i -e "s/'Ll/'ll/g" "$new".txt
+
+sed -i -e "s/i've/I've/g" "$new".txt
+
+sed -i -e 's/ i / I /g' "$new".txt
+
+sed -i -e "s/ gon na / gonna /g" "$new".txt
 
 # remove space before a period
 
 sed -i 's/ \././g' "$new".txt
 
-# replace curly quotes with straight quotes
-
-sed -i 's/”/"/g' "$new".txt
-
-sed -i 's/“/"/g' "$new".txt
-
-sed -i "s/’/'/g" "$new".txt
-
 # add a new line when a sentence having a `."` is not split
 
 sed -zi 's/\.”\s/.”\n\n/g' "$new".txt
 
-# Add Transcript text to the top of the TXT file, with a blank line before transcript
+# Delete commas between brackets
 
-awk -i inplace -v ORS='\r\n' 'FNR==1{print FILENAME " Transcript:"}1' "$new".txt 
+sed -i 's/\[,/\[/g' "$new".txt
 
-sed -i '1 s/^.*\///' "$new".txt
-
-sed -i '1 s/\.txt/ -/' "$new".txt
-
-sed -i '1 s/-wDX//' "$new".txt
-
-# Add a new line after the title of the transcript
-# sed -i '1 s/^.*$/&\n/g' "$new".txt
+sed -i 's/],/]/g' "$new".txt
 
 # Place blank lines in between sentences
 
@@ -197,17 +208,23 @@ sed -zi 's/\((\S[^)]*) \)/\1\n/g' "$new".txt
 # add new line characters after parentheses groups
 sed -i 's/.*\(([^()]*)\).*/\1\n/g' "$new".txt
 
+# Place bracket groups that start a line (speaker, music cues) on their own lines
+sed -zi 's/\([(\S[^)]*] \)/\1\n/g' "$new".txt
+
+# add new bracket characters after parentheses groups
+sed -i 's/.*\(\[[^[]*]\).*/\1\n/g' "$new".txt
+
+# Delete commas that appear within parentheses
+
+sed -E -i ':a; s/(\[[^],]*), */\1 /; ta; s/\[([^]]*)\]/(\1)/g' "$new".txt
+
 # remove dash that appears at the beginning of a new line
 
 perl -0777 -pi -e 's/\n- /\n/g' "$new".txt
 
-# Remove hyphens that appear after end of sentence punctuation
+# Capitalize words that start a new line and are lower-case
 
-sed -zi 's/\("\) - /\1\n\n/g' "$new".txt
-
-sed -zi 's/\(\.\) - /\1\n\n/g' "$new".txt
-
-sed -zi 's/\(\?\) - /\1\n\n/g' "$new".txt
+sed -i 's/^\([a-z]\)/\u\1/g' "$new".txt
 
 # Remove files
 
@@ -215,50 +232,5 @@ rm "$x"
 
 done
 
-# Correct error in file names that have -wDX
-
-if [ -n "$(find . -maxdepth 1 -name '*-wDX.txt' -type f -print -quit)" ]; then
-
-for f in *-wDX.txt; do 
-
-mv -- "$f" "${f//-wDX\.txt/\.txt}"; 
-
-done
-
-fi
-
-# Create HTML files
-
-for x in ./*.txt; do
-
-        basePath=${x%.*}
-        baseName=${basePath##*/}
-        export baseName
-
-new="${x%.*}"
-
-cp "$x" "$new".md
-
-sed -i '1 s/^/# /' "$new".md
-
-pandoc -M document-css=false -H /c/stylesheets/standard.css -i "$new".md -f markdown -s -t html5 --metadata pagetitle="$baseName"\ -\ Transcript -o "$new".html
-
-# Edit HTML
-# Add missing value for lang attribute
-
-sed -i 's/lang=""/lang="en"/g' "$new".html
-
-sed -i 's/”/"/g' "$new".html
-
-sed -i 's/“/"/g' "$new".html
-
-sed -i "s/’/'/g" "$new".html
-
-# Remove files
-
-rm "$new".md
-
-done
-
-echo -e "Converting YouTube Captions to transcripts... \033[1;32mDone\033[0m.\r"
+echo -e "Converting YouTube auto-captions to TXT... \033[1;32mDone\033[0m.\r"
 
